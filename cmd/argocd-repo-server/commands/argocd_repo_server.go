@@ -81,6 +81,8 @@ func NewCommand() *cobra.Command {
 		cmpUseManifestGeneratePaths        bool
 		ociMediaTypes                      []string
 		enableBuiltinGitConfig             bool
+		gitLsRemoteOptimizedEnabled        bool
+		gitLsRemoteOptimizedRefPrefixes    []string
 	)
 	command := cobra.Command{
 		Use:               cliName,
@@ -157,6 +159,8 @@ func NewCommand() *cobra.Command {
 				CMPUseManifestGeneratePaths:                  cmpUseManifestGeneratePaths,
 				OCIMediaTypes:                                ociMediaTypes,
 				EnableBuiltinGitConfig:                       enableBuiltinGitConfig,
+				GitLsRemoteOptimizedEnabled:                  gitLsRemoteOptimizedEnabled,
+				GitLsRemoteOptimizedRefPrefixes:              gitLsRemoteOptimizedRefPrefixes,
 			}, askPassServer)
 			errors.CheckError(err)
 
@@ -268,6 +272,8 @@ func NewCommand() *cobra.Command {
 	command.Flags().BoolVar(&cmpUseManifestGeneratePaths, "plugin-use-manifest-generate-paths", env.ParseBoolFromEnv("ARGOCD_REPO_SERVER_PLUGIN_USE_MANIFEST_GENERATE_PATHS", false), "Pass the resources described in argocd.argoproj.io/manifest-generate-paths value to the cmpserver to generate the application manifests.")
 	command.Flags().StringSliceVar(&ociMediaTypes, "oci-layer-media-types", env.StringsFromEnv("ARGOCD_REPO_SERVER_OCI_LAYER_MEDIA_TYPES", []string{"application/vnd.oci.image.layer.v1.tar", "application/vnd.oci.image.layer.v1.tar+gzip", "application/vnd.cncf.helm.chart.content.v1.tar+gzip"}, ","), "Comma separated list of allowed media types for OCI media types. This only accounts for media types within layers.")
 	command.Flags().BoolVar(&enableBuiltinGitConfig, "enable-builtin-git-config", env.ParseBoolFromEnv("ARGOCD_REPO_SERVER_ENABLE_BUILTIN_GIT_CONFIG", true), "Enable builtin git configuration options that are required for correct argocd-repo-server operation.")
+	command.Flags().BoolVar(&gitLsRemoteOptimizedEnabled, "git-ls-remote-optimized", env.ParseBoolFromEnv("ARGOCD_GIT_LS_REMOTE_OPTIMIZED_ENABLED", false), "Enable optimized git ls-remote calls using native Git and server-side ref narrowing where supported.")
+	command.Flags().StringSliceVar(&gitLsRemoteOptimizedRefPrefixes, "git-ls-remote-optimized-ref-prefixes", env.StringsFromEnv("ARGOCD_GIT_LS_REMOTE_OPTIMIZED_REF_PREFIXES", []string{"refs/heads/", "refs/tags/"}, ","), "Comma separated list of ref prefixes eligible for optimized git ls-remote resolution.")
 	tlsConfigCustomizerSrc = tls.AddTLSFlagsToCmd(&command)
 	cacheSrc = reposervercache.AddCacheFlagsToCmd(&command, cacheutil.Options{
 		OnClientCreated: func(client *redis.Client) {

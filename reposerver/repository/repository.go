@@ -118,6 +118,8 @@ type RepoServerInitConstants struct {
 	IncludeHiddenDirectories                     bool
 	CMPUseManifestGeneratePaths                  bool
 	EnableBuiltinGitConfig                       bool
+	GitLsRemoteOptimizedEnabled                  bool
+	GitLsRemoteOptimizedRefPrefixes              []string
 }
 
 var manifestGenerateLock = sync.NewKeyLock()
@@ -2582,7 +2584,8 @@ func (s *Service) newClient(repo *v1alpha1.Repository, opts ...git.ClientOpts) (
 	}
 	opts = append(opts,
 		git.WithEventHandlers(metrics.NewGitClientEventHandlers(s.metricsServer)),
-		git.WithBuiltinGitConfig(s.initConstants.EnableBuiltinGitConfig))
+		git.WithBuiltinGitConfig(s.initConstants.EnableBuiltinGitConfig),
+		git.WithOptimizedLsRemote(s.initConstants.GitLsRemoteOptimizedEnabled, s.initConstants.GitLsRemoteOptimizedRefPrefixes))
 	return s.newGitClient(repo.Repo, repoPath, repo.GetGitCreds(s.gitCredsStore), repo.IsInsecure(), repo.EnableLFS, repo.Proxy, repo.NoProxy, opts...)
 }
 
