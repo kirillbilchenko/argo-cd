@@ -114,6 +114,29 @@ func TestOptimizedLsRemoteBackport(t *testing.T) {
 	}
 }
 
+func TestOptimizedLsRemoteIgnoresUnusableClientRootBackport(t *testing.T) {
+	repoPath, expectedSHA := createOptimizedLsRemoteRepo(t)
+	clientRoot := filepath.Join(t.TempDir(), "not-a-directory")
+	require.NoError(t, os.WriteFile(clientRoot, nil, 0o600))
+
+	client, err := NewClientExt(
+		"file://"+repoPath,
+		clientRoot,
+		NopCreds{},
+		true,
+		false,
+		"",
+		"",
+		WithOptimizedLsRemote(true, []string{"refs/heads/", "refs/tags/"}),
+	)
+	require.NoError(t, err)
+
+	sha, handled, err := client.(*nativeGitClient).lsRemoteOptimized("HEAD")
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Equal(t, expectedSHA, sha)
+}
+
 func TestOptimizedLsRemoteHexLookingTagFallsBackBackport(t *testing.T) {
 	repoPath, expectedSHA := createOptimizedLsRemoteRepo(t)
 	require.NoError(t, runCmd(t.Context(), repoPath, "git", "tag", "20240101"))
