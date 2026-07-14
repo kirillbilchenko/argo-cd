@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,6 +80,46 @@ func TestOptimizedLsRemoteRefPrefixPlanBackport(t *testing.T) {
 			assert.Equal(t, tc.wantCache, cacheParts)
 		})
 	}
+}
+
+func TestOptimizedLsRemoteFetchesHeadOnlyWhenRequestedBackport(t *testing.T) {
+	fakeBin := t.TempDir()
+	fakeGit := filepath.Join(fakeBin, "git")
+	callsFile := filepath.Join(t.TempDir(), "calls")
+	const commitSHA = "abcdef0123456789abcdef0123456789abcdef01"
+	require.NoError(t, os.WriteFile(fakeGit, fmt.Appendf(nil, `#!/bin/sh
+printf '%%s\n' "$*" >> "$GIT_LS_REMOTE_CALLS_FILE"
+case "$*" in
+  *" HEAD") printf '%s\tHEAD\n' ;;
+  *) printf '%s\trefs/heads/main\n' ;;
+esac
+`, commitSHA, commitSHA), 0o755))
+	t.Setenv("GIT_LS_REMOTE_CALLS_FILE", callsFile)
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	repoURL := "https://example.com/repo.git"
+	client, err := NewClientExt(repoURL, filepath.Join(t.TempDir(), "client"), NopCreds{}, true, false, "", "",
+		WithOptimizedLsRemote(true, []string{"refs/heads/", "refs/tags/"}))
+	require.NoError(t, err)
+
+	sha, err := client.LsRemote("main")
+	require.NoError(t, err)
+	assert.Equal(t, commitSHA, sha)
+	calls, err := os.ReadFile(callsFile)
+	require.NoError(t, err)
+	assert.Equal(t, "-c protocol.version=2 ls-remote --heads --tags "+repoURL, strings.TrimSpace(string(calls)))
+
+	sha, err = client.LsRemote("HEAD")
+	require.NoError(t, err)
+	assert.Equal(t, commitSHA, sha)
+
+	calls, err = os.ReadFile(callsFile)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"-c protocol.version=2 ls-remote --heads --tags " + repoURL,
+		"-c protocol.version=2 ls-remote --heads --tags " + repoURL,
+		"-c protocol.version=2 ls-remote " + repoURL + " HEAD",
+	}, strings.Split(strings.TrimSpace(string(calls)), "\n"))
 }
 
 func TestOptimizedLsRemoteBackport(t *testing.T) {
@@ -181,5 +222,5 @@ func TestOptimizedLsRemoteCoveredMissDoesNotFallbackBackport(t *testing.T) {
 
 	_, err = client.LsRemote("refs/heads/missing")
 	require.ErrorContains(t, err, "unable to resolve 'refs/heads/missing'")
-	assert.Equal(t, 2, lsRemoteCalls)
+	assert.Equal(t, 1, lsRemoteCalls)
 }
